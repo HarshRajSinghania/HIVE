@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+{% block title %}{{ device_id }} — HIVE{% endblock %}
+
+{% block content %}
+<!-- Device Header -->
+<div class="device-header mb-4">
+  <div class="d-flex align-items-start gap-3">
+    <div class="device-type-icon">{{ device.device_type | default('unknown') }}</div>
+    <div class="flex-grow-1">
+      <h1 class="page-title mb-1">
+        <span class="text-accent">{{ device.device_model or device_id }}</span>
+      </h1>
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="badge bg-secondary">{{ device.device_type | upper }}</span>
+        <span class="text-muted small">{{ device.device_os }}</span>
+        <span class="text-muted small font-monospace">{{ device_id }}</span>
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('graph') }}?case_id={{ case_id }}&device_id={{ device_id }}"
+         class="btn btn-sm btn-outline-info">
+        <i class="bi bi-diagram-3 me-1"></i>Ego Graph
+      </a>
+      {% if has_ai %}
+      <a href="{{ url_for('ai_page') }}?case_id={{ case_id }}&q=Analyse+device+{{ device_id }}"
+         class="btn btn-sm btn-outline-success">
+        <i class="bi bi-cpu me-1"></i>AI Analysis
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Cluster badges -->
+  {% if clusters %}
+  <div class="mt-2 d-flex flex-wrap gap-2">
+    {% for cl in clusters %}
+    <a href="{{ url_for('cluster_view', cluster_id=cl.cluster_id) }}?case_id={{ case_id }}"
+       class="badge bg-info-subtle text-info border border-info text-decoration-none">
+      <i class="bi bi-collection me-1"></i>{{ cl.cluster_id }}
+      <span class="ms-1 opacity-75">{{ cl.cluster_type }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs hive-tabs mb-4" id="deviceTabs">
+  <li class="nav-item">
+    <a class="nav-link active" href="#tab-overview"   data-bs-toggle="tab">Overview</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#tab-entities"          data-bs-toggle="tab">
+      Entities
+      <span class="badge bg-accent text-dark ms-1">{{ shared_entities | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#tab-relationships"     data-bs-toggle="tab">
+      Relationships
+      <span class="badge bg-warning text-dark ms-1">{{ relationships | length }}</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#tab-timeline"          data-bs-toggle="tab">Timeline</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" href="#tab-leads"             data-bs-toggle="tab">
+      Leads
+      {% if leads %}<span class="badge bg-danger ms-1">{{ leads | length }}</span>{% endif %}
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+  <!-- Overview -->
+  <div class="tab-pane fade show active" id="tab-overview">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="card hive-card h-100">
+          <div class="card-header"><i class="bi bi-info-circle me-2"></i>Device Information</div>
+          <div class="card-body">
+            {% for label, val in [
+              ("Device ID",      device_id),
+              ("Type",           device.device_type),
+              ("Model",          device.device_model),
+              ("OS",             device.device_os),
+              ("Acquisition ID", device.acquisition_id),
+            ] %}
+            <div class="info-row">
+              <span class="info-label">{{ label }}</span>
+              <span class="info-value font-monospace small">{{ val or "—" }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card hive-card h-100">
+          <div class="card-header"><i class="bi bi-shield-exclamation me-2 text-warning"></i>Top Leads</div>
+          <div class="card-body p-0">
+            {% if leads %}
+            {% for ld in leads[:5] %}
+            <div class="lead-mini px-3 py-2 border-bottom border-surface">
+              <div class="d-flex align-items-start gap-2">
+                {{ ld.priority | priority_badge | safe }}
+                <span class="small text-muted">{{ ld.title[:80] }}</span>
+              </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-muted p-3 mb-0">No leads for this device.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Entities -->
+  <div class="tab-pane fade" id="tab-entities">
+    <div class="card hive-card">
+      <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-link-45deg me-2"></i>Shared Entities (cross-device)</span>
+        <button class="btn btn-xs btn-outline-secondary"
+                hx-get="{{ url_for('api_device_entities', device_id=device_id) }}?case_id={{ case_id }}"
+                hx-target="#entity-list-container">
+          <i class="bi bi-arrow-clockwise"></i> Refresh
+        </button>
+      </div>
+      <div class="card-body p-0" id="entity-list-container">
+        {% if shared_entities %}
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Type</th><th>Value</th><th>Devices</th><th>Significance</th><th></th></tr></thead>
+          <tbody>
+          {% for e in shared_entities %}
+          <tr>
+            <td>
+              <span class="entity-type-badge">
+                {{ e.entity_type | entity_icon }} {{ e.entity_type }}
+              </span>
+            </td>
+            <td class="font-monospace small text-accent">{{ e.entity_value[:50] }}</td>
+            <td><span class="badge bg-info">{{ e.device_count }}</span></td>
+            <td>
+              <div class="progress" style="height:4px;min-width:60px">
+                <div class="progress-bar bg-accent"
+                     style="width:{{ ((e.significance or 0) * 100) | int }}%"></div>
+              </div>
+            </td>
+            <td>
+              <a href="{{ url_for('entity_view') }}?case_id={{ case_id }}&type={{ e.entity_type }}&value={{ e.entity_value }}"
+                 class="btn btn-xs btn-outline-secondary">→</a>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No shared entities found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Relationships -->
+  <div class="tab-pane fade" id="tab-relationships">
+    <div class="card hive-card">
+      <div class="card-header"><i class="bi bi-diagram-3 me-2"></i>Device Relationships</div>
+      <div class="card-body p-0">
+        {% if relationships %}
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Peer Device</th><th>Strength</th><th>Score</th><th>Evidence</th><th>Entity Types</th><th></th></tr></thead>
+          <tbody>
+          {% for r in relationships %}
+          {% set peer = r.device_b if r.device_a == device_id else r.device_a %}
+          <tr>
+            <td>
+              <a href="{{ url_for('device_view', device_id=peer) }}?case_id={{ case_id }}"
+                 class="text-accent text-decoration-none font-monospace small">{{ peer }}</a>
+            </td>
+            <td>{{ r.strength | strength_badge | safe }}</td>
+            <td>
+              <span class="badge bg-{{ r.confidence_score | score_color }}">
+                {{ "%.2f" | format(r.confidence_score) }}
+              </span>
+            </td>
+            <td class="text-muted small">{{ r.evidence_count }} entities</td>
+            <td class="small text-muted">{{ r.relationship_types[:3] | join(", ") }}</td>
+            <td>
+              <a href="{{ url_for('graph') }}?case_id={{ case_id }}&device_id={{ device_id }}"
+                 class="btn btn-xs btn-outline-info"><i class="bi bi-diagram-3"></i></a>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No relationships found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Timeline -->
+  <div class="tab-pane fade" id="tab-timeline">
+    <div class="card hive-card">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Synchronised Timeline Events</div>
+      <div class="card-body p-0">
+        {% if timeline_events %}
+        <div class="timeline-container px-3 py-2">
+          {% for ev in timeline_events %}
+          {% set ea = ev.event_a or {} %}
+          {% set eb = ev.event_b or {} %}
+          <div class="timeline-entry">
+            <div class="timeline-dot"></div>
+            <div class="timeline-body">
+              <div class="d-flex gap-3 flex-wrap">
+                <div class="timeline-event">
+                  <span class="badge bg-secondary small">{{ ev.device_a }}</span>
+                  <span class="text-muted small ms-1">{{ ea.event_type }}</span>
+                  <div class="small text-muted">{{ ea.description | default("") | truncate(60) }}</div>
+                </div>
+                <div class="text-muted align-self-center">
+                  <i class="bi bi-arrow-left-right"></i>
+                  <span class="small">Δ{{ ev.delta_seconds | int }}s</span>
+                </div>
+                <div class="timeline-event">
+                  <span class="badge bg-secondary small">{{ ev.device_b }}</span>
+                  <span class="text-muted small ms-1">{{ eb.event_type }}</span>
+                  <div class="small text-muted">{{ eb.description | default("") | truncate(60) }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No synchronised timeline events found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Leads -->
+  <div class="tab-pane fade" id="tab-leads">
+    {% if leads %}
+    {% for ld in leads %}
+    <div class="card hive-card mb-3">
+      <div class="card-header d-flex align-items-center gap-2">
+        {{ ld.priority | priority_badge | safe }}
+        <span class="fw-semibold">{{ ld.title }}</span>
+        <span class="ms-auto badge bg-{{ ld.confidence | score_color }}">
+          {{ ld.confidence | pct }}
+        </span>
+      </div>
+      <div class="card-body">
+        <p class="text-muted mb-2">{{ ld.description }}</p>
+        {% if ld.entities %}
+        <div class="d-flex flex-wrap gap-2">
+          {% for e in ld.entities[:5] %}
+          <span class="badge bg-surface border border-surface-light font-monospace small">
+            {{ e.type | default("") }}: {{ e.value | default(e.count | string) }}
+          </span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="text-muted text-center py-5">No leads for this device.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Activate tab from URL hash
+const hash = window.location.hash;
+if (hash) {
+  const tab = document.querySelector(`.nav-link[href="${hash}"]`);
+  if (tab) new bootstrap.Tab(tab).show();
+}
+document.querySelectorAll('.nav-link[data-bs-toggle="tab"]').forEach(t => {
+  t.addEventListener('shown.bs.tab', e => {
+    history.replaceState(null, null, e.target.getAttribute('href'));
+  });
+});
+</script>
+{% endblock %}

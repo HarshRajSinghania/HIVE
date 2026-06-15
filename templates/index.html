@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}HIVE — Case List{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title">
+    <span class="text-accent">⬡</span> HIVE Command Center
+  </h1>
+  <p class="text-muted">High-scale Investigation &amp; Verification Engine — Select an investigation to begin.</p>
+</div>
+
+{% if not cases %}
+<div class="empty-state">
+  <div class="empty-icon">🗂️</div>
+  <h4>No Cases Found</h4>
+  <p class="text-muted">Run the HIVE pipeline to populate your evidence database.</p>
+  <div class="code-hint mt-3">
+    <code>python3 collector.py --mode artifact --auto-discover</code><br>
+    <code>python3 parser.py --evidence /evidence --case-id CASE-001</code><br>
+    <code>python3 correlator.py --db /evidence/CASE-001/hive_evidence.db --case-id CASE-001</code>
+  </div>
+</div>
+{% else %}
+
+<div class="row g-4">
+  {% for c in cases %}
+  <div class="col-12 col-lg-6 col-xl-4">
+    <div class="card hive-card case-card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span class="fw-bold text-accent">
+          <i class="bi bi-folder2 me-2"></i>{{ c.case_id }}
+        </span>
+        {% if c.leads_high > 0 %}
+        <span class="badge bg-danger">
+          <i class="bi bi-exclamation-triangle me-1"></i>{{ c.leads_high }} HIGH
+        </span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        <div class="stat-grid">
+          <div class="stat-item">
+            <div class="stat-value text-accent">{{ c.devices }}</div>
+            <div class="stat-label">Devices</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value text-warning">{{ c.relationships }}</div>
+            <div class="stat-label">Relationships</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value text-info">{{ c.clusters }}</div>
+            <div class="stat-label">Clusters</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value text-danger">{{ c.leads_high }}</div>
+            <div class="stat-label">High Leads</div>
+          </div>
+        </div>
+
+        {% if c.run %}
+        <div class="mt-3 text-muted small">
+          <i class="bi bi-clock me-1"></i>
+          Last correlated: {{ c.run.completed_at | dt_fmt }}
+        </div>
+        {% endif %}
+      </div>
+      <div class="card-footer d-flex gap-2">
+        <a href="{{ url_for('case_view', case_id=c.case_id) }}"
+           class="btn btn-sm btn-accent flex-grow-1">
+          <i class="bi bi-arrow-right-circle me-1"></i>Open Case
+        </a>
+        <a href="{{ url_for('graph') }}?case_id={{ c.case_id }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-diagram-3"></i>
+        </a>
+        {% if has_ai %}
+        <a href="{{ url_for('ai_page') }}?case_id={{ c.case_id }}"
+           class="btn btn-sm btn-outline-success">
+          <i class="bi bi-cpu"></i>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

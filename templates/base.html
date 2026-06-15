@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}HIVE Command Center{% endblock %}</title>
+
+  <!-- Bootstrap 5 dark -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- Bootstrap Icons -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- HIVE custom styles -->
+  <link href="{{ url_for('static', filename='css/hive.css') }}" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────────────────────────── -->
+<div class="hive-sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <span class="logo-hex">⬡</span>
+    <span class="logo-text">HIVE</span>
+    <small class="logo-sub">Command Center</small>
+  </div>
+
+  <!-- Case Selector -->
+  {% if all_cases %}
+  <div class="sidebar-section">
+    <label class="sidebar-label">ACTIVE CASE</label>
+    <select class="form-select form-select-sm case-selector"
+            onchange="switchCase(this.value)">
+      <option value="">— Select Case —</option>
+      {% for cid in all_cases %}
+      <option value="{{ cid }}"
+        {% if cid == current_case %}selected{% endif %}>{{ cid }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    {% for label, endpoint, icon in nav_items %}
+    <a class="sidebar-link {% if request.endpoint == endpoint %}active{% endif %}"
+       href="{{ url_for(endpoint) }}{% if current_case %}?case_id={{ current_case }}{% endif %}">
+      <span class="nav-icon">{{ icon }}</span>
+      <span class="nav-label">{{ label }}</span>
+    </a>
+    {% endfor %}
+  </nav>
+
+  <div class="sidebar-footer">
+    <small class="text-muted">HIVE v1.0.0</small>
+  </div>
+</div>
+
+<!-- ── Main Content ────────────────────────────────────────────────────── -->
+<div class="hive-main">
+
+  <!-- Top bar -->
+  <header class="hive-topbar">
+    <button class="btn btn-sm btn-ghost me-2" onclick="toggleSidebar()">
+      <i class="bi bi-list fs-5"></i>
+    </button>
+
+    <!-- Global search -->
+    <div class="topbar-search flex-grow-1" style="max-width:420px">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-surface border-surface">
+          <i class="bi bi-search text-muted"></i>
+        </span>
+        <input type="text" class="form-control bg-surface border-surface"
+               placeholder="Search entities, devices, clusters…"
+               hx-get="{{ url_for('api_search') }}"
+               hx-trigger="keyup changed delay:350ms"
+               hx-target="#topbar-results"
+               hx-vals='{"case_id":"{{ current_case }}"}'
+               name="q"
+               autocomplete="off"
+               id="topbar-search">
+      </div>
+      <div id="topbar-results" class="topbar-results shadow"></div>
+    </div>
+
+    <div class="ms-auto d-flex align-items-center gap-3">
+      {% if current_case %}
+      <span class="badge bg-accent text-dark fw-semibold">
+        <i class="bi bi-folder2-open me-1"></i>{{ current_case }}
+      </span>
+      {% endif %}
+      {% if has_ai %}
+      <span class="badge bg-success-subtle text-success border border-success">
+        <i class="bi bi-cpu me-1"></i>AI Active
+      </span>
+      {% endif %}
+    </div>
+  </header>
+
+  <!-- Page content -->
+  <main class="hive-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+      <div class="alert alert-{{ cat }} alert-dismissible fade show mb-3" role="alert">
+        {{ msg }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    <!-- HTMX loading indicator -->
+    <div id="hive-loading" class="htmx-indicator hive-loading-bar"></div>
+
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<!-- Click-away closes topbar search -->
+<div id="search-overlay" class="search-overlay d-none"
+     onclick="closeSearch()"></div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<script src="https://unpkg.com/cytoscape@3.27.0/dist/cytoscape.min.js"></script>
+<script src="{{ url_for('static', filename='js/hive.js') }}"></script>
+
+<script>
+function switchCase(cid) {
+  if (cid) window.location.href = '/case/' + encodeURIComponent(cid);
+}
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+  document.querySelector('.hive-main').classList.toggle('sidebar-collapsed');
+}
+function closeSearch() {
+  document.getElementById('topbar-results').innerHTML = '';
+  document.getElementById('search-overlay').classList.add('d-none');
+}
+document.getElementById('topbar-search').addEventListener('focus', () => {
+  document.getElementById('search-overlay').classList.remove('d-none');
+});
+// HTMX loading indicator
+document.body.addEventListener('htmx:beforeRequest',
+  () => document.getElementById('hive-loading').classList.add('loading'));
+document.body.addEventListener('htmx:afterRequest',
+  () => document.getElementById('hive-loading').classList.remove('loading'));
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

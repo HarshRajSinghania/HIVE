@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% block title %}{{ case_id }} — HIVE{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="page-title"><i class="bi bi-folder2-open me-2 text-accent"></i>{{ case_id }}</h1>
+    {% if stats.run.completed_at %}
+    <small class="text-muted">Last correlation: {{ stats.run.completed_at | dt_fmt }}</small>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('graph') }}?case_id={{ case_id }}" class="btn btn-sm btn-outline-info">
+      <i class="bi bi-diagram-3 me-1"></i>Graph
+    </a>
+    {% if has_ai %}
+    <a href="{{ url_for('ai_page') }}?case_id={{ case_id }}" class="btn btn-sm btn-outline-success">
+      <i class="bi bi-cpu me-1"></i>AI
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+<!-- ── Stat Cards ── -->
+<div class="row g-3 mb-4">
+  {% set stat_items = [
+    ("Devices",       stats.devices,       "bi-phone",          "accent",   url_for('devices', case_id=case_id)),
+    ("Relationships", stats.relationships, "bi-diagram-3",      "warning",  url_for('graph', case_id=case_id)),
+    ("Clusters",      stats.clusters,      "bi-collection",     "info",     url_for('clusters', case_id=case_id)),
+    ("Shared Ent.",   stats.shared_entities,"bi-link-45deg",    "primary",  url_for('search', case_id=case_id)),
+    ("HIGH Leads",    stats.leads_high,    "bi-exclamation-triangle","danger",url_for('leads', case_id=case_id, priority='HIGH')),
+    ("MEDIUM Leads",  stats.leads_medium,  "bi-dash-circle",    "warning",  url_for('leads', case_id=case_id, priority='MEDIUM')),
+  ] %}
+  {% for label, value, icon, color, link in stat_items %}
+  <div class="col-6 col-md-4 col-xl-2">
+    <a href="{{ link }}" class="text-decoration-none">
+      <div class="card hive-card stat-card h-100">
+        <div class="card-body text-center py-3">
+          <i class="bi {{ icon }} fs-4 text-{{ color }} mb-1 d-block"></i>
+          <div class="stat-big text-{{ color }}">{{ value }}</div>
+          <div class="stat-label-sm">{{ label }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-4">
+  <!-- ── Investigative Leads ── -->
+  <div class="col-12 col-xl-7">
+    <div class="card hive-card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-circle me-2 text-danger"></i>Top Investigative Leads</span>
+        <a href="{{ url_for('leads', case_id=case_id) }}" class="btn btn-xs btn-outline-secondary">All →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if leads %}
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr>
+            <th>Priority</th><th>Lead</th><th>Conf.</th><th>Devices</th>
+          </tr></thead>
+          <tbody>
+          {% for lead in leads %}
+          <tr class="clickable-row"
+              data-href="{{ url_for('leads', case_id=case_id) }}#{{ lead.lead_id | truncate_id }}">
+            <td>{{ lead.priority | priority_badge | safe }}</td>
+            <td class="text-truncate" style="max-width:280px">
+              <span title="{{ lead.title }}">{{ lead.title }}</span>
+            </td>
+            <td>
+              <span class="badge bg-{{ lead.confidence | score_color }}">
+                {{ lead.confidence | pct }}
+              </span>
+            </td>
+            <td class="text-muted small">{{ lead.devices | length }}d</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No leads found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Clusters ── -->
+  <div class="col-12 col-xl-5">
+    <div class="card hive-card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-collection me-2 text-info"></i>Detected Clusters</span>
+        <a href="{{ url_for('clusters', case_id=case_id) }}" class="btn btn-xs btn-outline-secondary">All →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if clusters %}
+        {% for cl in clusters %}
+        <a href="{{ url_for('cluster_view', cluster_id=cl.cluster_id) }}?case_id={{ case_id }}"
+           class="cluster-row text-decoration-none d-block px-3 py-2 border-bottom border-surface">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <span class="cluster-id">{{ cl.cluster_id }}</span>
+              <span class="badge bg-secondary ms-2 small">{{ cl.cluster_type }}</span>
+            </div>
+            <span class="text-muted small">{{ cl.device_count }} devices</span>
+          </div>
+          <div class="progress mt-1" style="height:3px">
+            <div class="progress-bar bg-accent"
+                 style="width:{{ (cl.cohesion_score * 100) | int }}%"></div>
+          </div>
+        </a>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted p-3 mb-0">No clusters detected.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Top Relationships ── -->
+  <div class="col-12 col-xl-6">
+    <div class="card hive-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-diagram-3 me-2 text-warning"></i>Strongest Relationships</span>
+        <a href="{{ url_for('graph', case_id=case_id) }}" class="btn btn-xs btn-outline-secondary">Graph →</a>
+      </div>
+      <div class="card-body p-0">
+        {% if relationships %}
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Device A</th><th></th><th>Device B</th><th>Strength</th><th>Score</th></tr></thead>
+          <tbody>
+          {% for r in relationships %}
+          <tr>
+            <td class="text-truncate" style="max-width:140px">
+              <a href="{{ url_for('device_view', device_id=r.device_a) }}?case_id={{ case_id }}"
+                 class="text-accent text-decoration-none small">{{ r.device_a }}</a>
+            </td>
+            <td class="text-center text-muted">↔</td>
+            <td class="text-truncate" style="max-width:140px">
+              <a href="{{ url_for('device_view', device_id=r.device_b) }}?case_id={{ case_id }}"
+                 class="text-accent text-decoration-none small">{{ r.device_b }}</a>
+            </td>
+            <td>{{ r.strength | strength_badge | safe }}</td>
+            <td><span class="badge bg-{{ r.confidence_score | score_color }}">{{ "%.2f" | format(r.confidence_score) }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No relationships found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Entity Type Breakdown ── -->
+  <div class="col-12 col-xl-6">
+    <div class="card hive-card">
+      <div class="card-header">
+        <i class="bi bi-bar-chart me-2 text-primary"></i>Entity Type Breakdown
+      </div>
+      <div class="card-body">
+        {% if entity_types %}
+        {% set max_count = entity_types[0].count if entity_types else 1 %}
+        {% for et in entity_types %}
+        <div class="mb-2">
+          <div class="d-flex justify-content-between small mb-1">
+            <span class="text-muted">{{ et._id }}</span>
+            <span class="text-light fw-semibold">{{ et.count }}</span>
+          </div>
+          <div class="progress" style="height:5px">
+            <div class="progress-bar bg-accent"
+                 style="width:{{ ((et.count / max_count) * 100) | int }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Recent AI Analyses ── -->
+  {% if ai_analyses %}
+  <div class="col-12">
+    <div class="card hive-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cpu me-2 text-success"></i>Recent AI Analyses</span>
+        <a href="{{ url_for('ai_page', case_id=case_id) }}" class="btn btn-xs btn-outline-secondary">AI →</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Query</th><th>Intent</th><th>Summary</th><th>Generated</th></tr></thead>
+          <tbody>
+          {% for a in ai_analyses %}
+          <tr class="clickable-row"
+              hx-get="{{ url_for('api_ai_analysis', analysis_id=a.analysis_id) }}"
+              hx-target="#ai-detail-modal-body"
+              data-bs-toggle="modal" data-bs-target="#ai-detail-modal">
+            <td class="text-truncate" style="max-width:200px">{{ a.query }}</td>
+            <td><span class="badge bg-info-subtle text-info small">{{ a.intent }}</span></td>
+            <td class="text-truncate text-muted" style="max-width:300px">{{ a.summary }}</td>
+            <td class="text-muted small">{{ a.created_at | dt_fmt }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- AI Detail Modal -->
+<div class="modal fade" id="ai-detail-modal" tabindex="-1">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content bg-surface border-surface">
+      <div class="modal-header border-surface">
+        <h5 class="modal-title text-accent"><i class="bi bi-cpu me-2"></i>AI Analysis Detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="ai-detail-modal-body">
+        <div class="text-center text-muted py-4">
+          <div class="spinner-border spinner-border-sm me-2"></div>Loading…
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.querySelectorAll('.clickable-row[data-href]').forEach(row => {
+  row.style.cursor = 'pointer';
+  row.addEventListener('click', () => window.location.href = row.dataset.href);
+});
+</script>
+{% endblock %}
