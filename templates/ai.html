@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}AI Intelligence — HIVE{% endblock %}
+
+{% block content %}
+<div class="page-header mb-4 d-flex align-items-center justify-content-between">
+  <div>
+    <h1 class="page-title">
+      <i class="bi bi-cpu me-2 text-success"></i>HIVE AI
+    </h1>
+    <p class="text-muted mb-0">
+      Evidence-aware intelligence powered by
+      <span class="badge bg-success-subtle text-success border border-success">{{ model.split('/')[-1] }}</span>
+    </p>
+  </div>
+  {% if not has_ai %}
+  <div class="alert alert-warning mb-0 py-2 px-3">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    Set <code>NVIDIA_API_KEY</code> to enable AI analysis.
+  </div>
+  {% endif %}
+</div>
+
+<div class="row g-4 h-100">
+  <!-- Chat Panel -->
+  <div class="col-12 col-xl-8">
+    <div class="card hive-card d-flex flex-column" style="height:calc(100vh - 200px)">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-chat-dots me-2 text-success"></i>Investigative Query</span>
+        <span class="text-muted small">Case: <strong class="text-accent">{{ case_id }}</strong></span>
+      </div>
+
+      <!-- Message thread -->
+      <div class="flex-grow-1 overflow-auto p-3" id="ai-thread">
+        <!-- AI welcome message -->
+        <div class="ai-message ai-message--system mb-3">
+          <div class="ai-avatar">⬡</div>
+          <div class="ai-bubble">
+            <div class="ai-sender">HIVE-AI</div>
+            <div class="ai-text">
+              I have access to the structured intelligence for case
+              <strong class="text-accent">{{ case_id }}</strong> including
+              device profiles, entity relationships, clusters, investigative
+              leads, and timeline data. Ask me anything about this investigation.
+              <div class="mt-2 d-flex flex-wrap gap-2">
+                {% for prompt in [
+                  "Who are the most likely operators in this case?",
+                  "Summarise the largest cluster",
+                  "Which device should I investigate first?",
+                  "Generate an intelligence brief",
+                  "What criminal infrastructure is present?",
+                  "Identify the highest-risk entities",
+                ] %}
+                <button class="btn btn-xs btn-outline-success suggestion-btn"
+                        onclick="usePrompt(this)">{{ prompt }}</button>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HTMX injects AI exchanges here -->
+        <div id="ai-messages"></div>
+        <div id="ai-thinking" class="ai-thinking d-none">
+          <div class="ai-avatar">⬡</div>
+          <div class="ai-bubble">
+            <div class="ai-sender">HIVE-AI</div>
+            <div class="ai-text text-muted">
+              <span class="spinner-border spinner-border-sm me-2"></span>
+              Retrieving evidence context and reasoning…
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input form -->
+      <div class="card-footer border-surface">
+        <form id="ai-form"
+              hx-post="{{ url_for('api_ai_ask') }}"
+              hx-target="#ai-messages"
+              hx-swap="beforeend"
+              hx-indicator="#ai-thinking"
+              {% if not has_ai %}class="opacity-50 pe-none"{% endif %}>
+          <input type="hidden" name="case_id" value="{{ case_id }}">
+          <div class="input-group">
+            <textarea class="form-control bg-surface border-surface"
+                      name="question" id="ai-input" rows="2"
+                      placeholder="Ask an investigative question…"
+                      {% if not has_ai %}disabled{% endif %}></textarea>
+            <button class="btn btn-success" type="submit"
+                    {% if not has_ai %}disabled{% endif %}>
+              <i class="bi bi-send-fill"></i>
+            </button>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <button type="button" class="btn btn-xs btn-outline-secondary"
+                    onclick="setQuestion('Perform a full risk assessment for this case')">
+              <i class="bi bi-shield-exclamation me-1"></i>Risk Assessment
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-secondary"
+                    onclick="setQuestion('Generate a comprehensive intelligence brief')">
+              <i class="bi bi-file-text me-1"></i>Intelligence Brief
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-secondary"
+                    onclick="setQuestion('Prioritise investigation targets and justify each ranking')">
+              <i class="bi bi-list-ol me-1"></i>Prioritise Targets
+            </button>
+            <button type="button" class="btn btn-xs btn-outline-secondary"
+                    onclick="setQuestion('Generate investigative hypotheses based on all available evidence')">
+              <i class="bi bi-lightbulb me-1"></i>Hypotheses
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- History & Recommendations Panel -->
+  <div class="col-12 col-xl-4">
+
+    <!-- Recent analyses -->
+    <div class="card hive-card mb-4">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Analysis History</div>
+      <div class="card-body p-0" style="max-height:340px;overflow-y:auto">
+        {% if ai_history %}
+        {% for a in ai_history %}
+        <div class="history-entry px-3 py-2 border-bottom border-surface clickable"
+             hx-get="{{ url_for('api_ai_analysis', analysis_id=a.analysis_id) }}"
+             hx-target="#ai-detail-panel"
+             style="cursor:pointer">
+          <div class="d-flex justify-content-between align-items-start">
+            <div class="small text-muted font-monospace">{{ a.created_at | dt_fmt }}</div>
+            <span class="badge bg-info-subtle text-info small">{{ a.intent | truncate(20) }}</span>
+          </div>
+          <div class="small mt-1 text-muted text-truncate">{{ a.query }}</div>
+          {% if a.summary %}
+          <div class="small text-muted mt-1 opacity-75 text-truncate">{{ a.summary }}</div>
+          {% endif %}
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted p-3 mb-0 small">No previous analyses.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- AI Analysis Detail (populated on click) -->
+    <div id="ai-detail-panel">
+      {% if recommendations %}
+      <div class="card hive-card">
+        <div class="card-header"><i class="bi bi-check2-circle me-2 text-warning"></i>AI Recommendations</div>
+        <div class="card-body p-0">
+          {% for rec in recommendations %}
+          <div class="px-3 py-2 border-bottom border-surface">
+            <div class="d-flex align-items-start gap-2">
+              <span class="badge bg-{{ 'danger' if rec.priority=='HIGH' else 'warning' if rec.priority=='MEDIUM' else 'success' }} mt-1">
+                {{ rec.priority }}
+              </span>
+              <span class="small">{{ rec.action }}</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% else %}
+      <div class="card hive-card">
+        <div class="card-body text-center text-muted py-4">
+          <i class="bi bi-cpu fs-2 d-block mb-2 opacity-25"></i>
+          AI analysis details will appear here
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function setQuestion(q) {
+  document.getElementById('ai-input').value = q;
+  document.getElementById('ai-input').focus();
+}
+function usePrompt(btn) { setQuestion(btn.textContent.trim()); }
+
+// Submit on Ctrl+Enter
+document.getElementById('ai-input')?.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('ai-form').dispatchEvent(new Event('submit', {bubbles:true}));
+  }
+});
+
+// Show thinking indicator and scroll to bottom after response
+document.getElementById('ai-form')?.addEventListener('htmx:beforeRequest', function() {
+  document.getElementById('ai-thinking').classList.remove('d-none');
+  scrollToBottom();
+});
+document.getElementById('ai-form')?.addEventListener('htmx:afterRequest', function() {
+  document.getElementById('ai-thinking').classList.add('d-none');
+  document.getElementById('ai-input').value = '';
+  scrollToBottom();
+});
+
+function scrollToBottom() {
+  const thread = document.getElementById('ai-thread');
+  thread.scrollTop = thread.scrollHeight;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,56 @@
+<!-- ═══════════════════════════════════════════════════════════════════
+     fragments/entity_list.html  — device entity list (HTMX refreshed)
+     ═══════════════════════════════════════════════════════════════════ -->
+{% if entities %}
+<div class="table-responsive">
+<table class="table table-dark table-hover table-sm mb-0">
+  <thead>
+    <tr>
+      <th>Type</th><th>Value</th><th>Devices</th><th>Significance</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for e in entities %}
+  <tr>
+    <td>
+      <span class="entity-type-badge small">
+        {{ e.entity_type|entity_icon }} {{ e.entity_type }}
+      </span>
+    </td>
+    <td class="font-monospace small text-accent">{{ e.entity_value[:50] }}</td>
+    <td><span class="badge bg-info">{{ e.device_count }}</span></td>
+    <td>
+      <div class="progress" style="height:4px;min-width:50px">
+        <div class="progress-bar bg-accent"
+             style="width:{{ ((e.significance or 0)*100)|int }}%"></div>
+      </div>
+    </td>
+    <td>
+      <a href="/entity?case_id={{ case_id }}&type={{ e.entity_type }}&value={{ e.entity_value }}"
+         class="btn btn-xs btn-outline-secondary">→</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted p-3 mb-0">No shared entities for this device.</p>
+{% endif %}
+
+
+<!-- ═══════════════════════════════════════════════════════════════════
+     fragments/leads_mini.html  — compact lead list for case dashboard
+     ═══════════════════════════════════════════════════════════════════ -->
+{% if leads %}
+{% for ld in leads %}
+<a href="/leads?case_id={{ case_id }}#{{ ld.lead_id }}"
+   class="d-flex align-items-center gap-2 px-3 py-2 border-bottom border-surface text-decoration-none lead-mini-row">
+  {{ ld.priority|priority_badge|safe }}
+  <span class="small text-muted text-truncate flex-grow-1">{{ ld.title }}</span>
+  <span class="badge bg-{{ ld.confidence|score_color }} ms-auto">{{ ld.confidence|pct }}</span>
+</a>
+{% endfor %}
+{% else %}
+<p class="text-muted p-3 mb-0 small">No leads found.</p>
+{% endif %}

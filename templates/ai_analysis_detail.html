@@ -1,0 +1,138 @@
+<!-- fragments/ai_analysis_detail.html — shown in the modal on case dashboard -->
+{% if not analysis %}
+<p class="text-danger">Analysis not found.</p>
+{% else %}
+<div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+  <span class="badge bg-info-subtle text-info border border-info">{{ analysis.intent }}</span>
+  <span class="badge bg-secondary font-monospace small">{{ analysis.model.split('/')[-1] if analysis.model else '—' }}</span>
+  <span class="badge bg-surface border border-surface-light small">{{ analysis.created_at|dt_fmt }}</span>
+  <span class="badge bg-surface border border-surface-light small">{{ analysis.duration_s }}s</span>
+  <span class="ms-auto text-muted small font-monospace">{{ analysis.analysis_id|truncate_id(8) }}</span>
+</div>
+
+<div class="p-3 bg-surface rounded mb-3">
+  <div class="small text-muted mb-1 fw-semibold">Query</div>
+  <div class="text-light">{{ analysis.query }}</div>
+</div>
+
+{% if analysis.risk_assessment %}
+{% set risk = analysis.risk_assessment %}
+<div class="alert alert-{{ 'danger' if risk.level in ('CRITICAL','HIGH') else 'warning' if risk.level=='MEDIUM' else 'success' }} mb-3">
+  <strong>{{ risk.level }} RISK</strong> ({{ risk.confidence|pct }})
+  — {{ risk.rationale }}
+</div>
+{% endif %}
+
+{% if analysis.summary %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-file-text me-2"></i>Summary</h6>
+  <p>{{ analysis.summary }}</p>
+</div>
+{% endif %}
+
+{% if analysis.key_findings %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-key me-2"></i>Key Findings</h6>
+  {% for f in analysis.key_findings %}
+  <div class="card hive-card mb-2">
+    <div class="card-body py-2 px-3">
+      <div class="d-flex align-items-start gap-2">
+        <span class="badge bg-{{ f.confidence|score_color }} flex-shrink-0">{{ f.confidence|pct }}</span>
+        <div>
+          <div class="small">{{ f.finding }}</div>
+          {% if f.evidence %}
+          <div class="d-flex flex-wrap gap-1 mt-1">
+            {% for ev in f.evidence %}
+            <span class="badge bg-surface border border-surface-light font-monospace" style="font-size:0.65rem">
+              {{ ev|truncate(50,True,'…') }}
+            </span>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if analysis.hypotheses %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-lightbulb me-2"></i>Hypotheses</h6>
+  {% for h in analysis.hypotheses %}
+  <div class="d-flex align-items-start gap-2 mb-2">
+    <span class="badge bg-info-subtle text-info border border-info flex-shrink-0">{{ h.confidence|pct }}</span>
+    <div>
+      <div class="small">{{ h.hypothesis }}</div>
+      {% if h.supporting_evidence %}
+      <div class="small text-muted mt-1">
+        <i class="bi bi-check-circle text-success me-1"></i>
+        {{ h.supporting_evidence[:2]|join(", ") }}
+      </div>
+      {% endif %}
+      {% if h.contradicting_evidence %}
+      <div class="small text-muted mt-1">
+        <i class="bi bi-x-circle text-danger me-1"></i>
+        {{ h.contradicting_evidence[:2]|join(", ") }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if analysis.recommended_actions %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-check2-circle me-2"></i>Recommended Actions</h6>
+  {% for ac in analysis.recommended_actions %}
+  <div class="d-flex align-items-start gap-2 mb-2">
+    <span class="badge bg-{{ 'danger' if ac.priority=='HIGH' else 'warning' if ac.priority=='MEDIUM' else 'success' }} flex-shrink-0">
+      {{ ac.priority }}
+    </span>
+    <div>
+      <div class="small">{{ ac.action }}</div>
+      {% if ac.rationale %}
+      <div class="x-small text-muted mt-1">{{ ac.rationale }}</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if analysis.key_entities %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-link-45deg me-2"></i>Key Entities</h6>
+  <div class="d-flex flex-wrap gap-2">
+    {% for e in analysis.key_entities %}
+    <div class="card hive-card p-2" style="min-width:160px">
+      <div class="badge bg-secondary mb-1">{{ e.type }}</div>
+      <div class="small font-monospace text-accent text-truncate" title="{{ e.value }}">{{ e.value }}</div>
+      {% if e.significance %}
+      <div class="x-small text-muted mt-1">{{ e.significance|truncate(60,True,'…') }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if analysis.investigative_questions %}
+<div class="mb-4">
+  <h6 class="text-accent"><i class="bi bi-question-circle me-2"></i>Open Questions</h6>
+  <ul class="mb-0">
+    {% for q in analysis.investigative_questions %}
+    <li class="small text-muted">{{ q }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if analysis.analyst_notes %}
+<div class="alert alert-secondary mb-0">
+  <i class="bi bi-info-circle me-2"></i><strong>Analyst Notes: </strong>{{ analysis.analyst_notes }}
+</div>
+{% endif %}
+{% endif %}

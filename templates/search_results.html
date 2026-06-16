@@ -1,0 +1,76 @@
+<!-- fragments/search_results.html  — returned by /api/search -->
+{% if not (entities or devices or clusters or leads) %}
+<div class="text-center text-muted py-4">
+  <i class="bi bi-search me-2"></i>No results for <strong>{{ query }}</strong>
+</div>
+{% else %}
+<div class="search-results-container">
+
+  {% if devices %}
+  <div class="search-section mb-3">
+    <div class="search-section-header">
+      <i class="bi bi-phone me-2 text-accent"></i>Devices ({{ devices|length }})
+    </div>
+    {% for d in devices %}
+    <a href="/device/{{ d.device_id }}?case_id={{ case_id }}"
+       class="search-result-row text-decoration-none d-flex align-items-center gap-3">
+      <span class="badge bg-secondary">{{ d.device_type | upper }}</span>
+      <span class="text-accent font-monospace small">{{ d.device_id }}</span>
+      <span class="text-muted small">{{ d.device_model or '' }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if entities %}
+  <div class="search-section mb-3">
+    <div class="search-section-header">
+      <i class="bi bi-link-45deg me-2 text-warning"></i>Entities ({{ entities|length }})
+    </div>
+    {% for e in entities %}
+    <a href="/entity?case_id={{ case_id }}&type={{ e.entity_type }}&value={{ e.entity_value }}"
+       class="search-result-row text-decoration-none d-flex align-items-center gap-3">
+      <span class="badge bg-warning-subtle text-warning border border-warning small">
+        {{ e.entity_type|entity_icon }} {{ e.entity_type }}
+      </span>
+      <span class="text-accent font-monospace small text-truncate" style="max-width:280px">
+        {{ e.entity_value }}
+      </span>
+      <span class="badge bg-info ms-auto">{{ e.device_count }} devices</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if clusters %}
+  <div class="search-section mb-3">
+    <div class="search-section-header">
+      <i class="bi bi-collection me-2 text-info"></i>Clusters ({{ clusters|length }})
+    </div>
+    {% for cl in clusters %}
+    <a href="/cluster/{{ cl.cluster_id }}?case_id={{ case_id }}"
+       class="search-result-row text-decoration-none d-flex align-items-center gap-3">
+      <span class="text-info font-monospace small">{{ cl.cluster_id }}</span>
+      <span class="badge bg-secondary small">{{ cl.cluster_type }}</span>
+      <span class="text-muted small ms-auto">{{ cl.device_count }} devices</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if leads %}
+  <div class="search-section">
+    <div class="search-section-header">
+      <i class="bi bi-exclamation-triangle me-2 text-danger"></i>Leads ({{ leads|length }})
+    </div>
+    {% for ld in leads %}
+    <a href="/leads?case_id={{ case_id }}#{{ ld.lead_id }}"
+       class="search-result-row text-decoration-none d-flex align-items-center gap-3">
+      {{ ld.priority|priority_badge|safe }}
+      <span class="text-muted small text-truncate" style="max-width:300px">{{ ld.title }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}

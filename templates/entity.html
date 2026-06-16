@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ entity_value[:40] if entity_value else 'Entity' }} — HIVE{% endblock %}
+{% block content %}
+<div class="page-header mb-4 d-flex align-items-start justify-content-between">
+  <div>
+    <div class="text-muted small mb-1">
+      <span class="badge bg-secondary">{{ entity_type or entity.entity_type or 'UNKNOWN' }}</span>
+    </div>
+    <h1 class="page-title font-monospace text-accent" style="word-break:break-all">
+      {{ entity_value or '—' }}
+    </h1>
+    {% if entity %}
+    <div class="d-flex gap-3 text-muted small mt-1">
+      <span><i class="bi bi-phone me-1"></i>{{ entity.device_count }} device(s)</span>
+      <span><i class="bi bi-clock me-1"></i>First seen: {{ entity.first_seen | dt_fmt }}</span>
+      <span><i class="bi bi-star me-1"></i>Significance: {{ "%.2f"|format(entity.significance or 0) }}</span>
+    </div>
+    {% endif %}
+  </div>
+  {% if has_ai %}
+  <a href="{{ url_for('ai_page') }}?case_id={{ case_id }}"
+     class="btn btn-sm btn-outline-success">
+    <i class="bi bi-cpu me-1"></i>AI Analysis
+  </a>
+  {% endif %}
+</div>
+
+<div class="row g-4">
+  <!-- Devices -->
+  <div class="col-12 col-lg-6">
+    <div class="card hive-card h-100">
+      <div class="card-header"><i class="bi bi-phone me-2 text-accent"></i>Appears On Devices</div>
+      <div class="card-body p-0">
+        {% if devices %}
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Device ID</th><th>Type</th><th>Model</th><th></th></tr></thead>
+          <tbody>
+          {% for d in devices %}
+          <tr>
+            <td class="font-monospace small text-accent">{{ d.device_id }}</td>
+            <td><span class="badge bg-secondary">{{ d.device_type }}</span></td>
+            <td class="small text-muted">{{ d.device_model or '—' }}</td>
+            <td><a href="{{ url_for('device_view', device_id=d.device_id) }}?case_id={{ case_id }}"
+                   class="btn btn-xs btn-outline-accent">→</a></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No devices found.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Infrastructure links -->
+  <div class="col-12 col-lg-6">
+    <div class="card hive-card h-100">
+      <div class="card-header"><i class="bi bi-diagram-2 me-2 text-warning"></i>Infrastructure Links</div>
+      <div class="card-body p-0">
+        {% if infra_links %}
+        {% for lk in infra_links %}
+        <div class="px-3 py-2 border-bottom border-surface">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-secondary small font-monospace">{{ lk.entity_a_type }}</span>
+            <span class="text-muted small text-truncate" style="max-width:130px">{{ lk.entity_a_val }}</span>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <span class="badge bg-warning-subtle text-warning small">{{ lk.link_type }}</span>
+            <i class="bi bi-arrow-right text-muted"></i>
+            <span class="badge bg-secondary small font-monospace">{{ lk.entity_b_type }}</span>
+            <a href="{{ url_for('entity_view') }}?case_id={{ case_id }}&type={{ lk.entity_b_type }}&value={{ lk.entity_b_val }}"
+               class="text-accent text-decoration-none small text-truncate" style="max-width:130px">
+              {{ lk.entity_b_val }}
+            </a>
+          </div>
+          <div class="text-muted small mt-1">{{ lk.devices|length }} shared device(s)</div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <p class="text-muted p-3 mb-0">No infrastructure links.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Related relationships -->
+  {% if relationships %}
+  <div class="col-12">
+    <div class="card hive-card">
+      <div class="card-header"><i class="bi bi-diagram-3 me-2 text-info"></i>Related Relationships</div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+        <table class="table table-dark table-hover table-sm mb-0">
+          <thead><tr><th>Device A</th><th></th><th>Device B</th><th>Strength</th><th>Score</th></tr></thead>
+          <tbody>
+          {% for r in relationships %}
+          <tr>
+            <td class="font-monospace small">
+              <a href="{{ url_for('device_view', device_id=r.device_a) }}?case_id={{ case_id }}"
+                 class="text-accent text-decoration-none">{{ r.device_a }}</a>
+            </td>
+            <td class="text-center text-muted">↔</td>
+            <td class="font-monospace small">
+              <a href="{{ url_for('device_view', device_id=r.device_b) }}?case_id={{ case_id }}"
+                 class="text-accent text-decoration-none">{{ r.device_b }}</a>
+            </td>
+            <td>{{ r.strength|strength_badge|safe }}</td>
+            <td><span class="badge bg-{{ r.confidence_score|score_color }}">{{ "%.2f"|format(r.confidence_score) }}</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Related Leads -->
+  {% if leads %}
+  <div class="col-12">
+    <div class="card hive-card">
+      <div class="card-header"><i class="bi bi-exclamation-circle me-2 text-danger"></i>Related Investigative Leads</div>
+      <div class="card-body p-0">
+        {% for ld in leads %}
+        <div class="px-3 py-2 border-bottom border-surface d-flex align-items-center gap-2">
+          {{ ld.priority|priority_badge|safe }}
+          <span class="small text-muted flex-grow-1">{{ ld.title }}</span>
+          <span class="badge bg-{{ ld.confidence|score_color }}">{{ ld.confidence|pct }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

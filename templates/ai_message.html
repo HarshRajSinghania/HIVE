@@ -1,0 +1,138 @@
+<!-- ═══════════════════════════════════════════════════════════════════════
+     fragments/ai_message.html — injected by HTMX after /api/ai/ask
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<!-- User question bubble -->
+<div class="ai-message ai-message--user mb-3">
+  <div class="ai-bubble">
+    <div class="ai-sender">Investigator</div>
+    <div class="ai-text">{{ question }}</div>
+  </div>
+  <div class="ai-avatar ai-avatar--user">👤</div>
+</div>
+
+<!-- AI response bubble -->
+<div class="ai-message ai-message--ai mb-4">
+  <div class="ai-avatar">⬡</div>
+  <div class="ai-bubble ai-bubble--ai {% if error %}ai-bubble--error{% endif %}">
+    <div class="ai-sender">
+      HIVE-AI
+      {% if analysis and not error %}
+      <span class="badge bg-success-subtle text-success border border-success ms-2 small">
+        {{ analysis.model.split('/')[-1] if analysis.model else 'AI' }}
+      </span>
+      <span class="badge bg-secondary ms-1 small">{{ analysis.duration_s }}s</span>
+      {% endif %}
+    </div>
+
+    {% if error %}
+    <div class="ai-text text-danger">⚠️ {{ summary }}</div>
+
+    {% elif analysis %}
+
+    <!-- Risk badge (if present) -->
+    {% if analysis.risk_assessment %}
+    {% set risk = analysis.risk_assessment %}
+    <div class="mb-2">
+      <span class="badge bg-{{ 'danger' if risk.level=='CRITICAL' else 'warning' if risk.level in ('HIGH','MEDIUM') else 'success' }} me-2">
+        {{ risk.level }} RISK
+      </span>
+      <span class="badge bg-info">{{ risk.confidence | pct }}</span>
+    </div>
+    {% endif %}
+
+    <!-- Summary -->
+    <div class="ai-text mb-3">{{ analysis.summary }}</div>
+
+    <!-- Key findings accordion -->
+    {% if analysis.key_findings %}
+    <div class="mb-3">
+      <div class="text-muted small mb-2 fw-semibold">
+        <i class="bi bi-key me-1"></i>Key Findings ({{ analysis.key_findings|length }})
+      </div>
+      {% for f in analysis.key_findings %}
+      <div class="ai-finding mb-2">
+        <div class="d-flex align-items-start gap-2">
+          <span class="badge bg-{{ f.confidence|score_color }} flex-shrink-0">
+            {{ f.confidence|pct }}
+          </span>
+          <div>
+            <div class="small">{{ f.finding }}</div>
+            {% if f.evidence %}
+            <div class="d-flex flex-wrap gap-1 mt-1">
+              {% for ev in f.evidence[:3] %}
+              <span class="badge bg-surface border border-surface-light small font-monospace">{{ ev|truncate(40,True,'…') }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Hypotheses -->
+    {% if analysis.hypotheses %}
+    <div class="mb-3">
+      <div class="text-muted small mb-2 fw-semibold">
+        <i class="bi bi-lightbulb me-1"></i>Hypotheses ({{ analysis.hypotheses|length }})
+      </div>
+      {% for h in analysis.hypotheses %}
+      <div class="ai-hypothesis mb-2 d-flex align-items-start gap-2">
+        <span class="badge bg-info-subtle text-info border border-info flex-shrink-0">
+          {{ h.confidence|pct }}
+        </span>
+        <span class="small">{{ h.hypothesis }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Recommended actions -->
+    {% if analysis.recommended_actions %}
+    <div class="mb-3">
+      <div class="text-muted small mb-2 fw-semibold">
+        <i class="bi bi-check2-circle me-1"></i>Recommended Actions
+      </div>
+      {% for ac in analysis.recommended_actions %}
+      <div class="ai-action mb-1 d-flex align-items-start gap-2">
+        <span class="badge bg-{{ 'danger' if ac.priority=='HIGH' else 'warning' if ac.priority=='MEDIUM' else 'success' }} flex-shrink-0">
+          {{ ac.priority }}
+        </span>
+        <span class="small">{{ ac.action }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Open questions -->
+    {% if analysis.investigative_questions %}
+    <div class="mb-2">
+      <div class="text-muted small mb-1 fw-semibold">
+        <i class="bi bi-question-circle me-1"></i>Open Questions
+      </div>
+      {% for q in analysis.investigative_questions %}
+      <div class="small text-muted">? {{ q }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Analyst notes -->
+    {% if analysis.analyst_notes %}
+    <div class="ai-notes small text-muted mt-2 p-2 rounded">
+      <i class="bi bi-info-circle me-1"></i>{{ analysis.analyst_notes }}
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="ai-footer mt-2 d-flex align-items-center gap-2">
+      <span class="x-small text-muted">ID: {{ analysis.analysis_id|truncate_id(8) }}</span>
+      <span class="x-small text-muted">{{ analysis.created_at|dt_fmt }}</span>
+    </div>
+
+    {% else %}
+    <div class="ai-text text-muted">{{ summary or 'No response received.' }}</div>
+    {% endif %}
+  </div>
+</div>

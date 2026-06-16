@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Investigative Leads — HIVE{% endblock %}
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between mb-4">
+  <h1 class="page-title"><i class="bi bi-exclamation-triangle me-2 text-danger"></i>Investigative Leads</h1>
+  <div class="text-muted small">Case: <strong class="text-accent">{{ case_id }}</strong></div>
+</div>
+
+<!-- Priority filter tabs -->
+<ul class="nav nav-pills mb-4">
+  {% for pri, badge_class in [('ALL','secondary'),('HIGH','danger'),('MEDIUM','warning'),('LOW','success')] %}
+  <li class="nav-item">
+    <a class="nav-link {% if priority == pri %}active{% endif %}"
+       href="{{ url_for('leads', case_id=case_id, priority=pri) }}">
+      {{ pri }}
+      {% set cnt = counts.get(pri, 0) if pri != 'ALL' else (counts.values()|sum) %}
+      <span class="badge bg-{{ badge_class }} ms-1">{{ cnt }}</span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+
+{% if leads %}
+{% for ld in leads %}
+<div class="card hive-card mb-3 lead-card" id="{{ ld.lead_id }}">
+  <div class="card-header d-flex align-items-center gap-3">
+    {{ ld.priority|priority_badge|safe }}
+    <span class="fw-semibold flex-grow-1">{{ ld.title }}</span>
+    <span class="badge bg-{{ ld.confidence|score_color }}">
+      {{ ld.confidence|pct }} confidence
+    </span>
+  </div>
+  <div class="card-body">
+    <p class="text-muted mb-3">{{ ld.description }}</p>
+    <div class="row g-2">
+      {% if ld.devices %}
+      <div class="col-12 col-md-6">
+        <div class="small text-muted mb-1">Linked Devices</div>
+        <div class="d-flex flex-wrap gap-1">
+          {% for dev in ld.devices[:6] %}
+          <a href="{{ url_for('device_view', device_id=dev) }}?case_id={{ case_id }}"
+             class="badge bg-secondary text-decoration-none font-monospace">{{ dev }}</a>
+          {% endfor %}
+          {% if ld.devices|length > 6 %}
+          <span class="badge bg-secondary">+{{ ld.devices|length - 6 }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if ld.entities %}
+      <div class="col-12 col-md-6">
+        <div class="small text-muted mb-1">Key Entities</div>
+        <div class="d-flex flex-wrap gap-1">
+          {% for e in ld.entities[:4] %}
+          {% if e is mapping %}
+          <a href="{{ url_for('entity_view') }}?case_id={{ case_id }}&type={{ e.get('type','') }}&value={{ e.get('value', e.get('count','')) }}"
+             class="badge bg-info-subtle text-info border border-info text-decoration-none font-monospace small">
+            {{ e.get('type','') }}: {{ e.get('value', '')|string|truncate(30,True,'…') }}
+          </a>
+          {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card-footer d-flex gap-2">
+    <span class="text-muted small me-auto">
+      <i class="bi bi-tag me-1"></i>{{ ld.lead_type }}
+    </span>
+    {% if ld.devices %}
+    <a href="{{ url_for('graph') }}?case_id={{ case_id }}&device_id={{ ld.devices[0] }}"
+       class="btn btn-xs btn-outline-info"><i class="bi bi-diagram-3 me-1"></i>Graph</a>
+    {% endif %}
+    {% if has_ai %}
+    <a href="{{ url_for('ai_page') }}?case_id={{ case_id }}"
+       class="btn btn-xs btn-outline-success"><i class="bi bi-cpu me-1"></i>AI</a>
+    {% endif %}
+  </div>
+</div>
+{% endfor %}
+
+<!-- Pagination -->
+{% if total_pages > 1 %}
+<nav class="mt-4">
+  <ul class="pagination pagination-sm justify-content-center">
+    {% for p in range(1, total_pages+1) %}
+    <li class="page-item {% if p == page %}active{% endif %}">
+      <a class="page-link bg-surface border-surface"
+         href="{{ url_for('leads', case_id=case_id, priority=priority, page=p) }}">{{ p }}</a>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="empty-state"><div class="empty-icon">⚡</div>
+  <h4>No Leads Found</h4>
+  <p class="text-muted">No leads match the selected priority filter.</p>
+</div>
+{% endif %}
+{% endblock %}

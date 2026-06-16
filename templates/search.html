@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Search — HIVE{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title"><i class="bi bi-search me-2 text-primary"></i>Global Search</h1>
+</div>
+<div class="card hive-card mb-4">
+  <div class="card-body">
+    <div class="input-group input-group-lg">
+      <span class="input-group-text bg-surface border-surface">
+        <i class="bi bi-search text-muted"></i>
+      </span>
+      <input type="text" class="form-control form-control-lg bg-surface border-surface"
+             id="main-search" placeholder="Search phone numbers, emails, wallets, IPs, domains, devices…"
+             value="{{ query }}"
+             hx-get="{{ url_for('api_search') }}"
+             hx-trigger="keyup changed delay:350ms, load[value.length>1]"
+             hx-target="#search-results"
+             hx-vals='{"case_id":"{{ case_id }}"}'
+             name="q" autocomplete="off">
+    </div>
+    <div class="text-muted small mt-2">
+      Search across entities, devices, clusters, and investigative leads for case
+      <strong class="text-accent">{{ case_id }}</strong>.
+    </div>
+  </div>
+</div>
+<div id="search-results">
+  {% if not query %}
+  <div class="text-center text-muted py-5 opacity-50">
+    <i class="bi bi-search fs-1 d-block mb-3"></i>Enter a search term to begin
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('main-search').focus();
+});
+</script>
+{% endblock %}

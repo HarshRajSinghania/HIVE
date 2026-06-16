@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}Intelligence Graph — HIVE{% endblock %}
+
+{% block extra_head %}
+<style>
+  #cy-container { width:100%; height:calc(100vh - 160px); background:#0d1117;
+                  border-radius:8px; border:1px solid #30363d; }
+  .cy-controls  { position:absolute; top:12px; left:12px; z-index:10; }
+  .cy-info      { position:absolute; top:12px; right:12px; z-index:10;
+                  width:280px; max-height:70vh; overflow-y:auto; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex align-items-center justify-content-between mb-3">
+  <h1 class="page-title"><i class="bi bi-diagram-3 me-2 text-info"></i>Intelligence Graph</h1>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="text-muted small" id="graph-status">Loading…</span>
+    <button class="btn btn-sm btn-outline-secondary" onclick="cy.fit()">
+      <i class="bi bi-fullscreen"></i> Fit
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="cy.zoom(cy.zoom()*1.25)">+</button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="cy.zoom(cy.zoom()*0.8)">−</button>
+  </div>
+</div>
+
+<div class="position-relative">
+  <!-- Controls panel -->
+  <div class="cy-controls">
+    <div class="card hive-card" style="min-width:220px">
+      <div class="card-body p-3">
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">View Mode</label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="mode" id="mode-rel"
+                   value="relationships" {% if mode=='relationships' %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm" for="mode-rel">Devices</label>
+
+            <input type="radio" class="btn-check" name="mode" id="mode-cl"
+                   value="clusters" {% if mode=='clusters' %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm" for="mode-cl">Clusters</label>
+
+            <input type="radio" class="btn-check" name="mode" id="mode-ent"
+                   value="entities" {% if mode=='entities' %}checked{% endif %}>
+            <label class="btn btn-outline-secondary btn-sm" for="mode-ent">Entities</label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">
+            Min Confidence: <span id="score-val">0.0</span>
+          </label>
+          <input type="range" class="form-range" id="min-score"
+                 min="0" max="1" step="0.05" value="0"
+                 oninput="document.getElementById('score-val').textContent=this.value">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small text-muted mb-1">Layout</label>
+          <select class="form-select form-select-sm bg-surface border-surface"
+                  id="layout-select" onchange="applyLayout(this.value)">
+            <option value="cose">Force-directed (CoSE)</option>
+            <option value="concentric">Concentric</option>
+            <option value="breadthfirst">Breadth-first</option>
+            <option value="circle">Circle</option>
+            <option value="grid">Grid</option>
+          </select>
+        </div>
+
+        <button class="btn btn-sm btn-accent w-100" onclick="loadGraph()">
+          <i class="bi bi-arrow-clockwise me-1"></i>Reload Graph
+        </button>
+
+        <!-- Legend -->
+        <hr class="border-surface my-3">
+        <div class="small text-muted mb-2">Relationship Strength</div>
+        {% for strength, color in [
+          ('DEFINITIVE','#ff4444'),('STRONG','#ffa500'),
+          ('MODERATE','#00d4aa'),('WEAK','#6e7681')] %}
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <div style="width:24px;height:3px;background:{{ color }};border-radius:2px"></div>
+          <span class="small">{{ strength }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Info panel (selected node) -->
+  <div class="cy-info" id="cy-info" style="display:none">
+    <div class="card hive-card shadow-lg">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span id="info-title" class="fw-semibold text-accent small"></span>
+        <button class="btn-close btn-close-white btn-sm"
+                onclick="document.getElementById('cy-info').style.display='none'"></button>
+      </div>
+      <div class="card-body p-3" id="info-body"></div>
+      <div class="card-footer d-flex gap-2" id="info-footer"></div>
+    </div>
+  </div>
+
+  <!-- Cytoscape canvas -->
+  <div id="cy-container"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CASE_ID     = {{ case_id | tojson }};
+const DEV_FILTER  = {{ device_filter | tojson }};
+let cy = null;
+
+function getMode() {
+  return document.querySelector('input[name="mode"]:checked')?.value || 'relationships';
+}
+
+function getMinScore() {
+  return parseFloat(document.getElementById('min-score').value || '0');
+}
+
+async function loadGraph() {
+  document.getElementById('graph-status').textContent = 'Loading…';
+  const mode  = getMode();
+  const score = getMinScore();
+  const url   = `/api/graph/data?case_id=${encodeURIComponent(CASE_ID)}`
+              + `&mode=${mode}&min_score=${score}`
+              + (DEV_FILTER ? `&device_id=${encodeURIComponent(DEV_FILTER)}` : '');
+  const res   = await fetch(url);
+  const data  = await res.json();
+  renderGraph(data.elements);
+  const n = (data.elements.nodes || []).length;
+  const e = (data.elements.edges || []).length;
+  document.getElementById('graph-status').textContent = `${n} nodes · ${e} edges`;
+}
+
+function renderGraph(elements) {
+  if (cy) cy.destroy();
+  cy = cytoscape({
+    container: document.getElementById('cy-container'),
+    elements:  elements,
+    style:     hiveCyStyle(),
+    layout:    { name: 'cose', animate: true, randomize: true,
+                  nodeRepulsion: 8000, idealEdgeLength: 120,
+                  edgeElasticity: 200, gravity: 0.25 },
+    minZoom: 0.1, maxZoom: 4,
+  });
+
+  cy.on('tap', 'node', function(evt) { showNodeInfo(evt.target); });
+  cy.on('tap', 'edge', function(evt) { showEdgeInfo(evt.target); });
+  cy.on('tap', function(evt) {
+    if (evt.target === cy)
+      document.getElementById('cy-info').style.display = 'none';
+  });
+}
+
+function hiveCyStyle() {
+  return [
+    { selector: 'node[type="device"]', style: {
+        'background-color': 'data(color)',
+        'border-width': 2, 'border-color': 'data(border)',
+        'label': 'data(label)',
+        'color': '#c9d1d9', 'font-size': 11,
+        'text-valign': 'bottom', 'text-margin-y': 6,
+        'shape': 'round-rectangle',
+        'width': 100, 'height': 36,
+        'text-wrap': 'ellipsis', 'text-max-width': 96,
+      }
+    },
+    { selector: 'node[type="entity"]', style: {
+        'background-color': 'data(color)',
+        'label': 'data(label)',
+        'color': '#c9d1d9', 'font-size': 10,
+        'text-valign': 'bottom', 'text-margin-y': 4,
+        'shape': 'ellipse',
+        'width': 'mapData(device_count, 2, 10, 28, 60)',
+        'height': 'mapData(device_count, 2, 10, 28, 60)',
+      }
+    },
+    { selector: 'edge', style: {
+        'line-color': 'data(color)',
+        'width': 'data(width)',
+        'opacity': 0.8,
+        'curve-style': 'bezier',
+        'label': '',
+      }
+    },
+    { selector: 'node:selected', style: {
+        'border-width': 3, 'border-color': '#00d4aa',
+        'background-color': '#1f3d35',
+      }
+    },
+    { selector: 'edge:selected', style: {
+        'line-color': '#00d4aa', 'width': 4,
+      }
+    },
+  ];
+}
+
+function showNodeInfo(node) {
+  const d    = node.data();
+  const info = document.getElementById('cy-info');
+  const ttl  = document.getElementById('info-title');
+  const body = document.getElementById('info-body');
+  const ftr  = document.getElementById('info-footer');
+
+  ttl.textContent = d.label || d.id;
+  if (d.type === 'device') {
+    body.innerHTML = `
+      <div class="info-row"><span class="info-label">Device ID</span>
+        <span class="font-monospace small text-accent">${d.id}</span></div>
+      <div class="info-row"><span class="info-label">Type</span>
+        <span class="badge bg-secondary">${d.device_type || '—'}</span></div>
+      ${d.cluster_id ? `<div class="info-row"><span class="info-label">Cluster</span>
+        <span class="badge bg-info-subtle text-info">${d.cluster_id}</span></div>` : ''}
+    `;
+    ftr.innerHTML = `
+      <a href="/device/${encodeURIComponent(d.id)}?case_id=${encodeURIComponent(CASE_ID)}"
+         class="btn btn-sm btn-accent flex-grow-1">View Device →</a>
+      <a href="/graph?case_id=${encodeURIComponent(CASE_ID)}&device_id=${encodeURIComponent(d.id)}"
+         class="btn btn-sm btn-outline-secondary">Ego Graph</a>
+    `;
+  } else {
+    body.innerHTML = `
+      <div class="info-row"><span class="info-label">Type</span>
+        <span class="badge bg-secondary">${d.entity_type || '—'}</span></div>
+      <div class="info-row"><span class="info-label">Value</span>
+        <span class="font-monospace small text-accent text-break">${d.label}</span></div>
+      <div class="info-row"><span class="info-label">Devices</span>
+        <span class="badge bg-info">${d.device_count || '?'}</span></div>
+    `;
+    ftr.innerHTML = `
+      <a href="/entity?case_id=${encodeURIComponent(CASE_ID)}&type=${encodeURIComponent(d.entity_type||'')}&value=${encodeURIComponent(d.label)}"
+         class="btn btn-sm btn-accent flex-grow-1">View Entity →</a>
+    `;
+  }
+  info.style.display = 'block';
+}
+
+function showEdgeInfo(edge) {
+  const d    = edge.data();
+  const info = document.getElementById('cy-info');
+  document.getElementById('info-title').textContent = `Relationship`;
+  document.getElementById('info-body').innerHTML = `
+    <div class="info-row"><span class="info-label">Source</span>
+      <span class="font-monospace small text-accent">${d.source}</span></div>
+    <div class="info-row"><span class="info-label">Target</span>
+      <span class="font-monospace small text-accent">${d.target}</span></div>
+    <div class="info-row"><span class="info-label">Strength</span>
+      <span class="badge bg-warning text-dark">${d.strength || '—'}</span></div>
+    <div class="info-row"><span class="info-label">Score</span>
+      <span class="badge bg-info">${d.score || '—'}</span></div>
+    <div class="info-row"><span class="info-label">Evidence</span>
+      <span>${d.evidence_count || 0} entities</span></div>
+    <div class="info-row"><span class="info-label">Types</span>
+      <span class="small text-muted">${d.types || '—'}</span></div>
+  `;
+  document.getElementById('info-footer').innerHTML = '';
+  info.style.display = 'block';
+}
+
+function applyLayout(name) {
+  if (!cy) return;
+  cy.layout({ name, animate: true,
+    nodeSep: 80, edgeSep: 40, rankSep: 100 }).run();
+}
+
+// Reload on mode/score change
+document.querySelectorAll('input[name="mode"]').forEach(r =>
+  r.addEventListener('change', loadGraph));
+document.getElementById('min-score').addEventListener('change', loadGraph);
+
+// Initial load
+loadGraph();
+</script>
+{% endblock %}

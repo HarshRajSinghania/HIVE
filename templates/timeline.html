@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Timeline — HIVE{% endblock %}
+{% block content %}
+<div class="page-header mb-4">
+  <h1 class="page-title"><i class="bi bi-clock-history me-2 text-info"></i>Activity Timeline</h1>
+</div>
+
+<!-- Filters -->
+<div class="card hive-card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <input type="hidden" name="case_id" value="{{ case_id }}">
+      <div class="col-md-4">
+        <label class="form-label small text-muted">Filter by Device</label>
+        <select class="form-select bg-surface border-surface" name="device_id">
+          <option value="">All Devices</option>
+          {% for d in devices %}
+          <option value="{{ d.device_id }}"
+            {% if d.device_id == device_filter %}selected{% endif %}>
+            {{ d.device_id }} ({{ d.device_type }})
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">From Date</label>
+        <input type="date" class="form-control bg-surface border-surface"
+               name="from" value="{{ from_ts[:10] if from_ts else '' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small text-muted">To Date</label>
+        <input type="date" class="form-control bg-surface border-surface"
+               name="to" value="{{ to_ts[:10] if to_ts else '' }}">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-accent w-100">
+          <i class="bi bi-funnel me-1"></i>Apply
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% if events %}
+<div class="card hive-card">
+  <div class="card-header">
+    <i class="bi bi-clock me-2"></i>Synchronised Events
+    <span class="badge bg-info ms-2">{{ events|length }}</span>
+    <span class="text-muted small ms-2">— events from different devices within 30-minute windows</span>
+  </div>
+  <div class="card-body p-0">
+    <div class="timeline-container">
+      {% for ev in events %}
+      {% set ea = ev.event_a or {} %}
+      {% set eb = ev.event_b or {} %}
+      <div class="timeline-row px-4 py-3 border-bottom border-surface">
+        <div class="row g-3 align-items-center">
+          <!-- Device A event -->
+          <div class="col-5">
+            <div class="d-flex align-items-start gap-2">
+              <span class="badge bg-secondary flex-shrink-0">{{ ev.device_a }}</span>
+              <div>
+                <div class="small fw-semibold text-accent">{{ ea.event_type or '—' }}</div>
+                <div class="small text-muted">{{ ea.description or '' }}</div>
+                <div class="x-small text-muted font-monospace">{{ ea.timestamp_utc | dt_fmt }}</div>
+              </div>
+            </div>
+          </div>
+          <!-- Delta -->
+          <div class="col-2 text-center">
+            <div class="sync-badge">
+              <i class="bi bi-arrow-left-right text-accent"></i>
+              <div class="small text-muted">Δ{{ ev.delta_seconds|int }}s</div>
+              <div class="x-small text-muted">sync {{ ev.sync_score | pct }}</div>
+            </div>
+          </div>
+          <!-- Device B event -->
+          <div class="col-5">
+            <div class="d-flex align-items-start gap-2">
+              <span class="badge bg-secondary flex-shrink-0">{{ ev.device_b }}</span>
+              <div>
+                <div class="small fw-semibold text-accent">{{ eb.event_type or '—' }}</div>
+                <div class="small text-muted">{{ eb.description or '' }}</div>
+                <div class="x-small text-muted font-monospace">{{ eb.timestamp_utc | dt_fmt }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="empty-icon">⏱️</div>
+  <h4>No Timeline Events</h4>
+  <p class="text-muted">No synchronised events found for the selected filters.</p>
+</div>
+{% endif %}
+{% endblock %}
