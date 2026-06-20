@@ -1056,8 +1056,8 @@ class Formatter:
             dom = cl.get("dominant_entities",[])
             if dom:
                 lines.append(
-                    f"    Dominant : "
-                    f"{', '.join(f'{e[\"type\"]}×{e[\"count\"]}' for e in dom[:4])}")
+                    "    Dominant : " +
+                    ", ".join(f"{e['type']}×{e['count']}" for e in dom[:4]))
             lines.append("")
         return "\n".join(lines)
 
