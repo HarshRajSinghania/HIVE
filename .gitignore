@@ -27,4 +27,5 @@ Thumbs.db
 # Mypy
 .mypy_cache/
 
+#Sqlite Databases
 *.sqlite
