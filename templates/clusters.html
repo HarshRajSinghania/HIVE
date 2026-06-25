@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Clusters — HIVE{% endblock %}
+
+{% block content %}
+
+<h1 class="mb-4">Clusters</h1>
+
+<div class="card hive-card">
+<div class="card-body">
+
+{% if clusters %}
+
+<table class="table table-dark table-hover">
+<thead>
+<tr>
+<th>Cluster ID</th>
+<th>Type</th>
+<th>Devices</th>
+<th>Cohesion</th>
+</tr>
+</thead>
+
+<tbody>
+
+{% for c in clusters %}
+<tr>
+
+<td class="font-monospace">
+{{ c.cluster_id }}
+</td>
+
+<td>
+{{ c.cluster_type }}
+</td>
+
+<td>
+{{ c.device_count }}
+</td>
+
+<td>
+{{ "%.2f"|format(c.cohesion_score) }}
+</td>
+
+</tr>
+{% endfor %}
+
+</tbody>
+</table>
+
+{% else %}
+
+<p>No clusters found.</p>
+
+{% endif %}
+
+</div>
+</div>
+
+{% endblock %}

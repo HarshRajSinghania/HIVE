@@ -586,7 +586,7 @@ def ai_page():
     case_id = request.args.get("case_id") or session.get("case_id","")
     db      = get_db()
     history = list(db.ai_analyses.find(
-        {"case_id": case_id}, {"_id": 0, "raw_response": 0,
+        {"case_id": case_id}, {"_id": 0,
          "key_findings": 1, "summary": 1, "query": 1,
          "intent": 1, "created_at": 1, "analysis_id": 1}
     ).sort("created_at", -1).limit(20))
